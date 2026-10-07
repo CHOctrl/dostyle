@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Donor Outfit Game</title>
+<style>
+:root{--bg:#f5f6fa;--card:#fff;--tx:#1b1b22;--mut:#777;--line:#e6e7ee;--pr:#0030ff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121218;--card:#1c1c26;--tx:#eee;--mut:#999;--line:#2d2d3a}}
+:root[data-theme="dark"]{--bg:#121218;--card:#1c1c26;--tx:#eee;--mut:#999;--line:#2d2d3a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:"Noto Sans Thai",system-ui,sans-serif}
+.w{max-width:1000px;margin:auto;padding:12px;display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:800px){.w{grid-template-columns:1fr 1fr}}
+.c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+h2{margin:0 0 8px;font-size:15px}
+.top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;grid-column:1/-1}
+input,select,button{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx)}
+button{cursor:pointer}button.p{background:var(--pr);color:#fff;border-color:var(--pr)}
+.row{display:flex;align-items:center;gap:8px;padding:6px;border-radius:10px;cursor:pointer}
+.row:hover,.row.me{background:var(--bg)}.row b{margin-left:auto;font-size:13px}
+.rk{width:22px;color:var(--mut);font-size:13px}
+.first{background:var(--pr);color:#fff;border-radius:14px;margin-bottom:6px}.first .rk{color:#fff}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tabs button.on{background:var(--pr);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.it{border:2px solid var(--line);border-radius:12px;padding:4px;text-align:center;font-size:11px;cursor:pointer;position:relative}
+.it.on{border-color:var(--pr)}.it.lock{opacity:.45}
+.pv{display:flex;justify-content:center}.pv svg{width:200px;height:280px;border-radius:14px}
+.mut{color:var(--mut);font-size:12px}
+</style></head><body>
+<div class="w">
+<div class="c top">
+ <b>เข้าสู่ระบบเป็น:</b>
+ <select id="who"></select>
+ <span class="mut">หรือพิมพ์ชื่อใหม่</span>
+ <input id="nm" placeholder="ชื่อโดเนท" size="14"><button id="go">เข้าสู่ระบบ</button>
+ <span id="st" class="mut"></span>
+</div>
+<div class="c"><h2>🏆 อันดับผู้โดเนท</h2><div id="lb"></div></div>
+<div class="c"><h2 id="ttl">ตัวละคร</h2>
+ <div class="pv" id="pv"></div>
+ <div class="tabs" id="tabs"></div><div class="grid" id="gr"></div>
+ <div style="margin-top:10px;display:flex;gap:8px;align-items:center"><button class="p" id="sv">💾 บันทึก</button><span class="mut" id="msg"></span></div>
+</div>
+</div>
+<script>
+// ---------- seed data (from leaderboard screenshot) ----------
+const SEED={"Fammy":26801.03,"lyn":4484.95,"ຂ":4380.56,"เสี่ยเด่น":4210.04,"moodeng":2620.16,"หมูโบโรน":2490,"Mimi":2141.12,"ร้อคกี้ซีเรียส":1459.99,"lyn โดเนทมา 10 บาท":600,"pe4ksl":535.6};
+// ---------- items: [name, unlock baht, svg]; first of each slot = default ----------
+const SK=["#ffd9b8","#f1c27d","#c68642","#8d5524"];
+const S={
+hair:{l:"ผม",i:[["โล้น",0,""],
+["ผมสั้น",0,'<path d="M31 36a19 19 0 0 1 38 0q-10-8-19-6-9-2-19 6z" fill="#3b2a20"/>'],
+["ผมยาว",100,'<path d="M30 40a20 20 0 0 1 40 0v28h-8V40q-12-5-24 0v28h-8z" fill="#7a3b1e"/>'],
+["ผมมวย",500,'<circle cx="50" cy="14" r="8" fill="#222"/><path d="M31 36a19 19 0 0 1 38 0q-10-8-19-6-9-2-19 6z" fill="#222"/>'],
+["ผมชมพู",1000,'<path d="M29 42a21 21 0 0 1 42 0v20h-7V40q-14-6-28 0v22h-7z" fill="#ff5fa2"/>'],
+["ผมทอง",2500,'<path d="M28 38l6-14 6 8 6-12 6 12 6-8 6 14q-18-8-36 0z" fill="#ffc400"/>']]},
+top:{l:"เสื้อ",i:[["เสื้อขาว",0,'<rect x="35" y="58" width="30" height="34" rx="8" fill="#f4f4f4"/>'],
+["เสื้อฟ้า",0,'<rect x="35" y="58" width="30" height="34" rx="8" fill="#4aa8ff"/>'],
+["ฮู้ดดี้แดง",100,'<rect x="33" y="57" width="34" height="36" rx="10" fill="#e5383b"/><rect x="44" y="76" width="12" height="8" rx="3" fill="#b02a2d"/>'],
+["ชุดสูท",500,'<rect x="35" y="58" width="30" height="34" rx="6" fill="#222"/><path d="M50 58l-5 14 5 20 5-20z" fill="#fff"/><path d="M50 62l-2 6 2 18 2-18z" fill="#c00"/>'],
+["เกราะเงิน",1000,'<rect x="34" y="57" width="32" height="36" rx="8" fill="#b8c2cc"/><path d="M50 60v30M38 70h24" stroke="#6b7785" stroke-width="2"/>'],
+["ชุดทอง VIP",5000,'<rect x="33" y="56" width="34" height="38" rx="9" fill="#ffc400"/><path d="M40 62l10 8 10-8" stroke="#a87b00" stroke-width="2" fill="none"/><circle cx="50" cy="80" r="4" fill="#fff6c2"/>']]},
+bottom:{l:"กางเกง",i:[["กางเกงดำ",0,'<rect x="36" y="90" width="12" height="30" rx="4" fill="#2b2b35"/><rect x="52" y="90" width="12" height="30" rx="4" fill="#2b2b35"/>'],
+["ยีนส์",100,'<rect x="36" y="90" width="12" height="30" rx="4" fill="#3d6bb3"/><rect x="52" y="90" width="12" height="30" rx="4" fill="#3d6bb3"/>'],
+["กระโปรง",500,'<path d="M34 90h32l6 22H28z" fill="#ff7aa8"/><rect x="38" y="112" width="8" height="8" fill="#ffd9b8"/><rect x="54" y="112" width="8" height="8" fill="#ffd9b8"/>'],
+["ขาสั้นลาย",1000,'<rect x="36" y="90" width="12" height="18" rx="4" fill="#2ba84a"/><rect x="52" y="90" width="12" height="18" rx="4" fill="#2ba84a"/><rect x="38" y="108" width="8" height="12" fill="#ffd9b8"/><rect x="54" y="108" width="8" height="12" fill="#ffd9b8"/>'],
+["กางเกงทอง",5000,'<rect x="36" y="90" width="12" height="30" rx="4" fill="#ffc400"/><rect x="52" y="90" width="12" height="30" rx="4" fill="#ffc400"/>']]},
+shoes:{l:"รองเท้า",i:[["เท้าเปล่า",0,""],
+["ผ้าใบขาว",0,'<rect x="34" y="118" width="15" height="8" rx="4" fill="#fff" stroke="#999"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#fff" stroke="#999"/>'],
+["บูทดำ",500,'<rect x="34" y="114" width="15" height="12" rx="3" fill="#111"/><rect x="51" y="114" width="15" height="12" rx="3" fill="#111"/>'],
+["รองเท้าไฟ",2500,'<rect x="34" y="118" width="15" height="8" rx="4" fill="#ff6a00"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#ff6a00"/><path d="M36 126h11M53 126h11" stroke="#ffe600" stroke-width="2"/>']]},
+hat:{l:"หมวก",i:[["ไม่มี",0,""],
+["หมวกแก๊ป",100,'<path d="M30 30a20 18 0 0 1 40 0z" fill="#e5383b"/><rect x="28" y="29" width="30" height="5" rx="2" fill="#b02a2d"/>'],
+["หมวกแม่มด",1000,'<path d="M50 -4l-14 32h28z" fill="#5b2a86"/><rect x="26" y="26" width="48" height="5" rx="2" fill="#3d1a5c"/>'],
+["มงกุฎ",5000,'<path d="M30 28l4-16 8 8 8-12 8 12 8-8 4 16z" fill="#ffc400" stroke="#a87b00"/><circle cx="50" cy="20" r="3" fill="#e5383b"/>'],
+["รัศมีเทพ",20000,'<ellipse cx="50" cy="12" rx="20" ry="5" fill="none" stroke="#ffe600" stroke-width="3"/>']]},
+acc:{l:"ของประดับ",i:[["ไม่มี",0,""],
+["แว่นกลม",100,'<circle cx="43" cy="38" r="6" fill="none" stroke="#333" stroke-width="2"/><circle cx="57" cy="38" r="6" fill="none" stroke="#333" stroke-width="2"/><path d="M49 38h2" stroke="#333" stroke-width="2"/>'],
+["แว่นดำ",500,'<rect x="36" y="34" width="12" height="8" rx="3" fill="#111"/><rect x="52" y="34" width="12" height="8" rx="3" fill="#111"/>'],
+["ผ้าพันคอ",1000,'<rect x="38" y="54" width="24" height="7" rx="3" fill="#ff9f1c"/><rect x="56" y="58" width="6" height="14" rx="2" fill="#ff9f1c"/>'],
+["ปีกนางฟ้า",10000,'<path d="M34 64q-26-18-22-40 14 6 22 24zM66 64q26-18 22-40-14 6-22 24z" fill="#fff" stroke="#9ad" stroke-width="1.5"/>']]},
+bg:{l:"ฉาก",i:[["ธรรมดา",0,'<rect width="100" height="140" fill="#e9ecff"/>'],
+["ท้องฟ้า",0,'<rect width="100" height="140" fill="#9fd3ff"/><circle cx="80" cy="22" r="9" fill="#ffe27a"/>'],
+["พระอาทิตย์ตก",500,'<rect width="100" height="140" fill="#ff9e7a"/><circle cx="50" cy="100" r="30" fill="#ffd36e"/>'],
+["อวกาศ",2500,'<rect width="100" height="140" fill="#10113a"/><g fill="#fff"><circle cx="15" cy="20" r="1.2"/><circle cx="80" cy="30" r="1.5"/><circle cx="25" cy="90" r="1"/><circle cx="88" cy="95" r="1.2"/></g>'],
+["สนามทอง",10000,'<rect width="100" height="140" fill="#3a2a00"/><circle cx="50" cy="70" r="55" fill="#ffc40044"/><circle cx="50" cy="70" r="35" fill="#ffc40055"/>']]}};
+const ORDER=Object.keys(S),DEF={skin:1,hair:1,top:1,bottom:0,shoes:1,hat:0,acc:0,bg:0};
+function draw(o){o={...DEF,...o};const g=(k)=>(S[k].i[o[k]]||S[k].i[0])[2];
+ return `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">${g("bg")}${o.acc==4?g("acc"):""}
+ <rect x="36" y="90" width="12" height="30" rx="4" fill="${SK[o.skin]}"/><rect x="52" y="90" width="12" height="30" rx="4" fill="${SK[o.skin]}"/>
+ ${g("bottom")}${g("shoes")}
+ <rect x="26" y="60" width="9" height="26" rx="4" fill="${SK[o.skin]}"/><rect x="65" y="60" width="9" height="26" rx="4" fill="${SK[o.skin]}"/>
+ ${g("top")}<circle cx="50" cy="38" r="18" fill="${SK[o.skin]}"/>
+ <circle cx="43" cy="39" r="2" fill="#222"/><circle cx="57" cy="39" r="2" fill="#222"/><path d="M45 46q5 4 10 0" stroke="#a33" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+ ${g("hair")}${o.acc==4?"":g("acc")}${g("hat")}</svg>`}
+// ---------- state ----------
+let amounts={...SEED},chars={},me=null,cur={...DEF},tab="hair",db=null,user=null;
+const $=id=>document.getElementById(id),hex=s=>[...new TextEncoder().encode(s)].map(b=>b.toString(16).padStart(2,"0")).join("");
+const fmt=n=>n.toLocaleString("en-US",{maximumFractionDigits:2});
+try{const l=JSON.parse(localStorage.getItem("og_chars")||"{}");chars={...l}}catch(e){}
+function load(){const o=chars[me];cur={...DEF,...(o||{})}}
+function renderLB(){const L=Object.entries(amounts).sort((a,b)=>b[1]-a[1]);
+ $("lb").innerHTML=L.map(([n,a],i)=>`<div class="row ${i==0?"first":""} ${n==me?"me":""}" data-n="${n.replace(/"/g,"&quot;")}"><span class="rk">${i+1}</span><span style="width:34px;height:48px;display:inline-block">${draw(chars[n]).replace("<svg",'<svg style="width:34px;height:48px;border-radius:6px"')}</span><span>${n.replace(/</g,"&lt;")}</span><b>${fmt(a)} บาท</b></div>`).join("");
+ $("lb").querySelectorAll(".row").forEach(r=>r.onclick=()=>login(r.dataset.n));
+ const sel=$("who");sel.innerHTML='<option value="">เลือกชื่อ…</option>'+L.map(([n])=>`<option>${n.replace(/</g,"&lt;")}</option>`).join("");sel.value=me||""}
+function renderEd(){
+ if(!me){$("ttl").textContent="👈 เลือกชื่อเพื่อเริ่มแต่งตัว";$("pv").innerHTML=draw(DEF);$("tabs").innerHTML=$("gr").innerHTML="";return}
+ const amt=amounts[me]||0;$("ttl").textContent=`${me} · ยอดโดเนท ${fmt(amt)} บาท`;$("pv").innerHTML=draw(cur);
+ $("tabs").innerHTML=[...ORDER,"skin"].map(k=>`<button class="${k==tab?"on":""}" data-k="${k}">${k=="skin"?"สีผิว":S[k].l}</button>`).join("");
+ $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{tab=b.dataset.k;renderEd()});
+ if(tab=="skin"){$("gr").innerHTML=SK.map((c,i)=>`<div class="it ${cur.skin==i?"on":""}" data-i="${i}"><div style="height:40px;border-radius:8px;background:${c}"></div></div>`).join("")}
+ else $("gr").innerHTML=S[tab].i.map((it,i)=>{const lock=amt<it[1];return `<div class="it ${cur[tab]==i?"on":""} ${lock?"lock":""}" data-i="${i}" data-l="${lock?1:0}">${draw({...DEF,[tab]:i,hair:tab=="hair"?i:0,top:tab=="top"?i:DEF.top}).replace("<svg",'<svg style="width:100%;height:70px"')}${it[0]}<br>${lock?"🔒 "+fmt(it[1])+"฿":"✓"}</div>`}).join("");
+ $("gr").querySelectorAll(".it").forEach(e=>e.onclick=()=>{if(e.dataset.l=="1")return msg("🔒 ต้องโดเนทถึงยอดนี้ก่อน");cur[tab]=+e.dataset.i;renderEd()})}
+function msg(t){$("msg").textContent=t}
+function login(n){n=(n||"").trim();if(!n)return;if(!(n in amounts))amounts[n]=0;me=n;load();$("nm").value="";renderLB();renderEd();msg("")}
+async function save(){if(!me)return;chars[me]=cur;
+ try{localStorage.setItem("og_chars",JSON.stringify(chars))}catch(e){}
+ try{const r=await fetch("/api/chars",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:me,o:cur})});if(!r.ok)throw 0;msg("✅ บันทึกแล้ว ทุกคนเห็นตัวละครคุณ")}catch(e){msg("⚠️ บันทึกในเครื่องเท่านั้น (เชื่อมต่อเซิร์ฟเวอร์ไม่ได้)")}
+ renderLB()}
+$("go").onclick=()=>login($("nm").value);$("nm").onkeydown=e=>{if(e.key=="Enter")login($("nm").value)};
+$("who").onchange=e=>login(e.target.value);$("sv").onclick=save;
+renderLB();renderEd();$("st").textContent="โหมดในเครื่อง";
+// ---------- shared data from /api/chars ----------
+async function pull(){try{const r=await fetch("/api/chars");if(!r.ok)throw 0;const d=await r.json();
+ for(const n in d){if(n!==me)chars[n]=d[n];else if(!chars[n])chars[n]=d[n]}
+ $("st").textContent="🟢 ออนไลน์ · ทุกคนเห็นกัน";renderLB()}catch(e){$("st").textContent="โหมดในเครื่อง"}}
+pull();setInterval(pull,10000);
+</script></body></html>
