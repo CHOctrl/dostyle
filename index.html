@@ -95,7 +95,7 @@ function draw(o){o={...DEF,...o};const g=(k)=>(S[k].i[o[k]]||S[k].i[0])[2];
 let amounts={...SEED},chars={},me=null,cur={...DEF},tab="hair",db=null,user=null;
 const $=id=>document.getElementById(id),hex=s=>[...new TextEncoder().encode(s)].map(b=>b.toString(16).padStart(2,"0")).join("");
 const fmt=n=>n.toLocaleString("en-US",{maximumFractionDigits:2});
-try{const l=JSON.parse(localStorage.getItem("og_chars")||"{}");chars={...l}}catch(e){}
+
 function load(){const o=chars[me];cur={...DEF,...(o||{})}}
 function renderLB(){const L=Object.entries(amounts).sort((a,b)=>b[1]-a[1]);
  $("lb").innerHTML=L.map(([n,a],i)=>`<div class="row ${i==0?"first":""} ${n==me?"me":""}" data-n="${n.replace(/"/g,"&quot;")}"><span class="rk">${i+1}</span><span style="width:34px;height:48px;display:inline-block">${draw(chars[n]).replace("<svg",'<svg style="width:34px;height:48px;border-radius:6px"')}</span><span>${n.replace(/</g,"&lt;")}</span><b>${fmt(a)} บาท</b></div>`).join("");
@@ -111,16 +111,18 @@ function renderEd(){
  $("gr").querySelectorAll(".it").forEach(e=>e.onclick=()=>{if(e.dataset.l=="1")return msg("🔒 ต้องโดเนทถึงยอดนี้ก่อน");cur[tab]=+e.dataset.i;renderEd()})}
 function msg(t){$("msg").textContent=t}
 function login(n){n=(n||"").trim();if(!n)return;if(!(n in amounts))amounts[n]=0;me=n;load();$("nm").value="";renderLB();renderEd();msg("")}
-async function save(){if(!me)return;chars[me]=cur;
- try{localStorage.setItem("og_chars",JSON.stringify(chars))}catch(e){}
- try{const r=await fetch("/api/chars",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:me,o:cur})});if(!r.ok)throw 0;msg("✅ บันทึกแล้ว ทุกคนเห็นตัวละครคุณ")}catch(e){msg("⚠️ บันทึกในเครื่องเท่านั้น (เชื่อมต่อเซิร์ฟเวอร์ไม่ได้)")}
+async function save(){if(!me)return;
+ try{const r=await fetch("/api/chars",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:me,o:cur})});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);
+  chars[me]={...cur};msg("✅ บันทึกแล้ว ทุกคนเห็นตัวละครคุณ");await pull()}
+ catch(e){msg("❌ บันทึกไม่สำเร็จ: "+(e.message=="no-redis"?"ยังไม่ได้เชื่อม Redis ใน Vercel":e.message)+" (คนอื่นจะไม่เห็น)")}
  renderLB()}
 $("go").onclick=()=>login($("nm").value);$("nm").onkeydown=e=>{if(e.key=="Enter")login($("nm").value)};
 $("who").onchange=e=>login(e.target.value);$("sv").onclick=save;
-renderLB();renderEd();$("st").textContent="โหมดในเครื่อง";
-// ---------- shared data from /api/chars ----------
-async function pull(){try{const r=await fetch("/api/chars");if(!r.ok)throw 0;const d=await r.json();
- for(const n in d){if(n!==me)chars[n]=d[n];else if(!chars[n])chars[n]=d[n]}
- $("st").textContent="🟢 ออนไลน์ · ทุกคนเห็นกัน";renderLB()}catch(e){$("st").textContent="โหมดในเครื่อง"}}
-pull();setInterval(pull,10000);
+renderLB();renderEd();$("st").textContent="กำลังเชื่อมต่อ…";
+// ---------- shared data: server is the single source of truth ----------
+async function pull(){try{const r=await fetch("/api/chars",{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error(d.error||r.status);
+ chars=d;$("st").textContent="🟢 ออนไลน์ · ทุกคนเห็นตัวละครเดียวกัน";renderLB()}
+ catch(e){$("st").textContent="🔴 ต่อเซิร์ฟเวอร์ไม่ได้: "+(e.message=="no-redis"?"ยังไม่ได้เชื่อม Redis":e.message)}}
+pull();setInterval(pull,5000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 </script></body></html>
